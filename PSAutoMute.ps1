@@ -1,9 +1,9 @@
 [cmdletbinding()]
 Param()
 
+#Adding definitions for accessing the Audio API
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
-
 [Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IAudioEndpointVolume {
   // f(), g(), ... are unused COM method slots. Define these if you care
@@ -25,7 +25,6 @@ interface IMMDeviceEnumerator {
   int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice endpoint);
 }
 [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class MMDeviceEnumeratorComObject { }
-
 public class Audio {
   static IAudioEndpointVolume Vol() {
     var enumerator = new MMDeviceEnumeratorComObject() as IMMDeviceEnumerator;
@@ -45,12 +44,15 @@ public class Audio {
     set { Marshal.ThrowExceptionForHR(Vol().SetMute(value, System.Guid.Empty)); }
   }
 }
-'@
+'@ -Verbose
 
 
 While($true)
 {
+    #Clean all events in the current session since its in a infinite loop, to make a fresh start when loop begins
     Get-Event | Remove-Event -ErrorAction SilentlyContinue
+
+    #Registering the Event and Waiting for event to be triggered
     Register-WmiEvent -Class Win32_DeviceChangeEvent
     Wait-Event -OutVariable Event |Out-Null
 
@@ -58,7 +60,8 @@ While($true)
     Sort-Object TIME_CREATED -Descending | `
     Select-Object EventType -ExpandProperty EventType -First 1
 
-    If($EventType -eq 3)
+    #Conditional logic to handle, When to Mute/unMute the machine using Audio API
+    If($EventType -eq 3)  
     {
         [Audio]::Mute = $true
         Write-Verbose "Muted [$((Get-Date).tostring())]"
